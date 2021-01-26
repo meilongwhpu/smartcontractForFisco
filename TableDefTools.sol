@@ -28,9 +28,10 @@ contract TableDefTools {
     }
      //fields的索引ID  mapping(tableName=>mapping(field=>index))
     mapping(string => mapping(string => uint))  fieldsIndex;
-    
+
     /******* 使用到的表结构 *******/
     Bean  t_enterpriseInfo_struct;
+    Bean  t_enterprise_manager_struct;
 
     /******* 执行状态码常量 *******/
     int8 constant internal INITIAL_STATE = 0;
@@ -41,17 +42,17 @@ contract TableDefTools {
     int8 constant internal FAIL_INSERT = -4;
     int8 constant internal FAIL_LACK_BALANCE = -5;
     int8 constant internal FAIL_NO_REWARD = -6;
-    
+
     // 新增记录的事件
     event InsertRecord(string tableName,string primaryKey,string fields);
     // 更新记录的事件
     event UpdateRecord(string tableName,string primaryKey,string fields);
-    
+
     //更新错误的日志
     event UpdateRecordError(string tableName,string primaryKey,string fields,string msg);
-    
+
     event Debug(string msg);
-    
+
     // 企业信息表
     // 表名称：t_enterpriseInfo
     // 表主键：enterprise_id
@@ -61,6 +62,14 @@ contract TableDefTools {
     string constant internal TABLE_ENTERPRISE_PRIMARYKEY = "enterprise_id";
     string constant internal TABLE_ENTERPRISE_FIELDS = "name,abbreviation,stock_code,unified_social_code,type,reg_time,reg_address,office_address,website";
 
+    // 企业董监高表
+    // 表名称：t_enterprisemanager
+    // 表主键：enterprise_id
+    // 表字段：address,position,entryTime;
+
+    string constant internal TABLE_ENTERPRISE_MANAGER_NAME = "t_enterprisemanager";
+    string constant internal TABLE_ENTERPRISE_MANAGER_PRIMARYKEY = "enterprise_id";
+    string constant internal TABLE_ENTERPRISE_MANAGER_FIELDS = "address,position,entryTime";
    /*
     * 字符串数组生成工具
     *
@@ -152,6 +161,27 @@ contract TableDefTools {
         return StringUtil.getJsonString(_tableStruct.fields, _primaryKey, entries);
     }
 
+   /*
+    * 查询表中一条记录并以Json格式输出
+    *
+    * @param _tableStruct    表结构
+    * @param _primaryKey     待查记录的主键
+    *
+    * @return 执行状态码
+    * @return 该记录的json字符串
+    */
+    function selectMultRecordToArray(Bean storage _tableStruct, string memory _primaryKey, string[2]  _conditionPair,string memory _field) internal view returns (int8, string[] memory) {
+        // 打开表
+        Table table = openTable(_tableStruct.tableName);
+        Condition condition = table.newCondition();
+        if(_conditionPair.length == 2){
+             condition.EQ(_conditionPair[0], _conditionPair[1]);
+        }
+        // 查询
+        Entries entries = table.select(_primaryKey, condition);
+        // 将查询结果封装为数组
+        return StringUtil.getFieldValueArray(_tableStruct.fields, _primaryKey, entries,_field);
+    }
 
    /*
     * 查询表中一条记录并以字符串数组的格式输出

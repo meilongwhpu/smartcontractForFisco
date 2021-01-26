@@ -2,7 +2,7 @@ pragma solidity ^0.4.25;
 pragma experimental ABIEncoderV2;
 
 import "./TableDefTools.sol";
-
+import "./LibAddress.sol";
 
 /*
 * EnterpriseInfoAdmin实现企业的链上信息管理，
@@ -19,12 +19,11 @@ contract EnterpriseInfoAdmin is TableDefTools{
     * @return   无
     */
     constructor() public{
-
         initTableStruct(t_enterpriseInfo_struct, TABLE_ENTERPRISE_NAME, TABLE_ENTERPRISE_PRIMARYKEY, TABLE_ENTERPRISE_FIELDS);
-
+        initTableStruct(t_enterprise_manager_struct, TABLE_ENTERPRISE_MANAGER_NAME, TABLE_ENTERPRISE_MANAGER_PRIMARYKEY, TABLE_ENTERPRISE_MANAGER_FIELDS);
     }
-    
-    
+
+
    /*
     * 新增企业
     *
@@ -41,13 +40,46 @@ contract EnterpriseInfoAdmin is TableDefTools{
     *                   网址 website
     * @return 执行状态码
     *
-    * 测试举例  参数一："QY00001"  参数二："测试有限公司,测试,999999,90000U1231,1,1998-03-13,中国重庆解放碑,中国重庆解放碑交易大厦,www.chn-cstc.com"
+    * 测试举例  参数一："QY00001"  参数二："测试有限公司,测试,999999,90000U1231,1,19980313,中国重庆解放碑,中国重庆解放碑交易大厦,www.chn-cstc.com"
     */
     function insertEnterpriseInfo(string memory _enterpriseId, string memory _fields) public returns(int8){
-
         return insertOneRecord(t_enterpriseInfo_struct, _enterpriseId, _fields, false);
     }
-    
+
+
+   /*
+    * 新增企业高管
+    *
+    * @param _enterpriseId  企业ID
+    * @param _fields 企业高管表各字段值拼接成的字符串，包括如下：
+    *                   高管账户地址
+    *                   高管职位
+    *                   高管入职时间
+    * @return 执行状态码
+    *
+    * 测试举例  参数一："QY00001"  参数二："0x3d3216f529fd7a030852d0af08017c9ef89777c6 ,总经理,19980313"
+    */
+    function insertEnterpriseManager(string memory _enterpriseId, string memory _fields) public returns(int8){
+        return insertOneRecord(t_enterprise_manager_struct, _enterpriseId, _fields,true);
+    }
+
+    function getEnterpriseManager(string memory _enterpriseId) public returns(address[]){
+        address[] memory addresslist;
+        int8 queryRetCode;
+        // 数据表返回信息
+        string[] memory retArray;
+       (queryRetCode, retArray) = selectMultRecordToArray(t_enterprise_manager_struct, _enterpriseId, ["enterprise_id",_enterpriseId],"address");
+       emit Debug(TypeConvertUtil.uintToString(uint(retArray.length)));
+       emit Debug(retArray[0]);
+       emit Debug(TypeConvertUtil.uintToString(uint(queryRetCode)));
+       if(queryRetCode == SUCCESS_RETURN){
+          addresslist=new address[](retArray.length);
+          for(uint i=0;i<retArray.length;i++){
+              addresslist[i]=LibAddress.stringToAddress(retArray[i]);
+          }
+       }
+        return addresslist;
+    }
     /*
      * 更新企业名称
      *
@@ -59,7 +91,7 @@ contract EnterpriseInfoAdmin is TableDefTools{
         int8 updateRetCode;
         // 数据表返回信息
         string[] memory retArray;
-        
+
         // 查看该企业记录信息
         (queryRetCode, retArray) = selectOneRecordToArray(t_enterpriseInfo_struct, _enterpriseId, ["enterprise_id", _enterpriseId]);
         // 若存在该企业记录
@@ -73,18 +105,18 @@ contract EnterpriseInfoAdmin is TableDefTools{
            }
         }
          // 若更新失败
-         return FAIL_RETURN;      
-    }    
-    
+         return FAIL_RETURN;
+    }
+
     /*
      * 更新企业字段的值
      *
-     */    
+     */
     function updateEnterpriseInfo(string memory _enterpriseId, string memory _field, string memory _value) public returns(int8){
         if(StringUtil.compareTwoString(_field,t_enterpriseInfo_struct.primaryKey)){
             emit UpdateRecordError(t_enterpriseInfo_struct.tableName,t_enterpriseInfo_struct.primaryKey,_field,"不能修改主键的值");
                // 若更新失败
-           return FAIL_RETURN;     
+           return FAIL_RETURN;
         }
         // 查询企业信息返回状态
         int8 queryRetCode;
@@ -101,25 +133,25 @@ contract EnterpriseInfoAdmin is TableDefTools{
         // 若存在该企业记录
         if(queryRetCode == SUCCESS_RETURN){
             fieldIndex=fieldsIndex[t_enterpriseInfo_struct.tableName][_field];
-            
+
             if(fieldIndex==0){
                  emit UpdateRecordError(t_enterpriseInfo_struct.tableName,t_enterpriseInfo_struct.primaryKey,_field,"拟修改的field值不存在");
                   // 若更新失败
             return FAIL_RETURN;
             }
-            emit Debug(StringUtil.uint2str(fieldIndex));
+            emit Debug(TypeConvertUtil.uintToString(fieldIndex));
             changedFieldsStr = updateFieldsValue(retArray, fieldIndex-1, _value);
-            updateRetCode= updateOneRecord(t_enterpriseInfo_struct, _enterpriseId, changedFieldsStr); 
+            updateRetCode= updateOneRecord(t_enterpriseInfo_struct, _enterpriseId, changedFieldsStr);
         }
         	 // 若更新成功
            if(updateRetCode == SUCCESS_RETURN){
            		return SUCCESS_RETURN;
            }
          // 若更新失败
-         return FAIL_RETURN;      
-    }  
-    
-        
+         return FAIL_RETURN;
+    }
+
+
    /*
     * 修改各字段中某一个字段，字符串格式输出
     *
@@ -135,7 +167,7 @@ contract EnterpriseInfoAdmin is TableDefTools{
         fieldsArray[index] = values;
         return StringUtil.strConcatWithComma(fieldsArray);
     }
-    
+
 
    /*
     * 查询企业信息并以字符串数组方式输出
@@ -152,6 +184,19 @@ contract EnterpriseInfoAdmin is TableDefTools{
         return selectOneRecordToArray(t_enterpriseInfo_struct, enterpriseId, ["enterprise_id",enterpriseId]);
     }
 
+
+    function getEnterpriseType(string enterpriseId)public view returns(uint){
+        int8 queryRetCode;
+        uint types;
+        // 数据表返回信息
+        string[] memory retArray;
+
+       (queryRetCode, retArray) = selectOneRecordToArray(t_enterpriseInfo_struct, enterpriseId, ["enterprise_id",enterpriseId]);
+       if(queryRetCode == SUCCESS_RETURN){
+           types = TypeConvertUtil.stringToUint(retArray[4]);
+       }
+        return types;
+    }
 
    /*
     * 查询企业信息并以Json字符串方式输出
